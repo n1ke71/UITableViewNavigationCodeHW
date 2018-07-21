@@ -10,9 +10,8 @@
 
 @interface DirectoryViewController : UITableViewController
 
-@property (strong, nonatomic) NSString *path;
-@property (strong, nonatomic) NSArray *contents;
 
 - (id)initWithFolderPath:(NSString *) path;
+
 
 @end

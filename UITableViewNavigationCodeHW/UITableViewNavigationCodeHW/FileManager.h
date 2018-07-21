@@ -13,13 +13,9 @@
 @property (strong, nonatomic) NSString *path;
 @property (strong, nonatomic) NSArray *contents;
 
-- (void)contentsAtPath:(NSString *)path;
-
-
-
 - (BOOL)isDirectoryAtIndexPath:(NSUInteger)indexPath;
-- (BOOL)createFolderWithName:(NSString *)folderName;
-- (BOOL)deleteFolderAtPath:(NSString *)path;
-- (NSString *)sizeOfFile:(NSString *)filePath;
-- (NSString *)typeOfFile:(NSString *)filePath;
+- (void)createFolderWithName:(NSString *)folderName;
+- (void)deleteFolderAtPath:(NSString *)path;
+- (NSString *)sizeOfFile:(NSString *)fileName;
+- (NSString *)sizeOfFolder:(NSString *)folderName;
 @end

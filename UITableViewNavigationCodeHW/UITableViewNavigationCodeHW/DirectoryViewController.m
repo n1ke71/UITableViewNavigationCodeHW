@@ -11,7 +11,6 @@
 
 @interface DirectoryViewController ()
 
-@property (strong, nonatomic) UIAlertController *alertController;
 @property (strong, nonatomic) FileManager *fileManager;
 
 @end
@@ -24,13 +23,8 @@
     
     if (self) {
         
-        self.path = path;
-        NSError *error = nil;
-        self.contents = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:path error:&error];
-
-        if (error) {
-            NSLog(@"%@",[error localizedDescription]);
-        }
+        self.fileManager = [[FileManager alloc]init];
+        self.fileManager.path = path;
     }
     
     return self;
@@ -40,9 +34,8 @@
 - (void)viewDidLoad {
     
     [super viewDidLoad];
-    self.alertController = [self folderNameAlertController];
+
     self.navigationItem.rightBarButtonItems = [self makeItemsArray];
-    
     
 }
 
@@ -54,37 +47,39 @@
                                                                 style:UIBarButtonItemStylePlain
                                                                target:self
                                                                action:@selector(actionBackToRoot:)];
-    
-    UIBarButtonItem *itemAdd = [[UIBarButtonItem alloc] initWithTitle:@"Add"
+    UIBarButtonItem *itemAdd = [[UIBarButtonItem alloc]initWithTitle:@"Add"
                                                                 style:UIBarButtonItemStylePlain
                                                                target:self
                                                                action:@selector(actionAddFolder:)];
-    UIBarButtonItem *itemEdit = [[UIBarButtonItem alloc]initWithBarButtonSystemItem:UIBarButtonSystemItemEdit
-                                                                             target:self
-                                                                             action:@selector(actionEdit:)];
-    
-    
+    UIBarButtonItem *itemEdit = [[UIBarButtonItem alloc]initWithTitle:@"Edit"
+                                                               style:UIBarButtonItemStylePlain
+                                                              target:self
+                                                              action:@selector(actionEdit:)];
+
     return @[itemAdd,itemEdit,itemRoot];
 }
 
 
 
 - (void)actionBackToRoot:(UIBarButtonItem *)sender{
-    
+
     if ([self.navigationController.viewControllers count] > 1){
         
         [self.navigationController popToRootViewControllerAnimated:YES];
     }
 }
+
 - (void)actionAddFolder:(UIBarButtonItem *)sender{
 
-    [self presentViewController:self.alertController animated:YES completion:nil];
+    [self presentViewController:[self folderNameAlertController] animated:YES completion:nil];
 }
+
 - (void)actionEdit:(UIBarButtonItem *)sender{
     
     BOOL isEditing = self.tableView.editing;
     [self.tableView setEditing:!isEditing animated:YES];
-    
+    sender.title = isEditing? @"Edit":@"Done";
+
 }
 
 - (UIAlertController *)folderNameAlertController{
@@ -96,24 +91,28 @@ UIAlertController *alertController = [UIAlertController alertControllerWithTitle
 [alertController addTextFieldWithConfigurationHandler:^(UITextField *textField) {
     
     textField.placeholder = @"New folder name";
+    [textField becomeFirstResponder];
 }];
 UIAlertAction* actionOK = [UIAlertAction actionWithTitle:@"OK"
                                                    style:UIAlertActionStyleDefault
                                                  handler:^(UIAlertAction * _Nonnull action) {
                                                      
   UITextField *field = [alertController.textFields firstObject];
-/*  FileManager *manager = [[FileManager alloc]init];
-  [manager createFolderWithName:field.text];
-  NSArray *currentContent = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:manager.path error:nil];
-  manager.contents = [NSMutableArray arrayWithArray:currentContent];
-  field.text = @"";
+
+  [self.fileManager createFolderWithName:field.text];
   [self.tableView reloadData];
-                                                     */
+  field.text = @"";
+  [field resignFirstResponder];
+
  }];
 
 UIAlertAction* actionCancel = [UIAlertAction actionWithTitle:@"Cancel"
                                                        style:UIAlertActionStyleDefault
-                                                     handler:nil];
+                                                     handler:^(UIAlertAction * _Nonnull action) {
+                                                      
+ UITextField *field = [alertController.textFields firstObject];
+ field.text = @"";
+}];
 
 [alertController addAction:actionCancel];
 [alertController addAction:actionOK];
@@ -121,20 +120,12 @@ UIAlertAction* actionCancel = [UIAlertAction actionWithTitle:@"Cancel"
     return alertController;
 }
 
-- (BOOL)isDirectoryAtIndexPath:(NSIndexPath *)indexPath{
-    
-    NSString *fileName = [self.contents objectAtIndex:indexPath.row];
-    BOOL isDidectory = NO;
-    NSString *filePath = [self.path stringByAppendingPathComponent:fileName];
-    [[NSFileManager defaultManager] fileExistsAtPath:filePath isDirectory:&isDidectory];
-    return isDidectory;
-}
 
 #pragma mark - UITableViewDataSource
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     
-    return [self.contents count];
+    return [self.fileManager.contents count];
 }
 
 
@@ -142,25 +133,21 @@ UIAlertAction* actionCancel = [UIAlertAction actionWithTitle:@"Cancel"
     
     static NSString *identifier = @"Cell";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:identifier];
-    
+   
     if (!cell) {
-        
         cell = [[UITableViewCell alloc]initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:identifier];
     }
-    
-    NSString *fileName = [self.contents objectAtIndex:indexPath.row];
-    
+    NSString *fileName = [self.fileManager.contents objectAtIndex:indexPath.row];
     cell.textLabel.text = fileName;
     
-    if ([self isDirectoryAtIndexPath:indexPath]) {
+    if ([self.fileManager isDirectoryAtIndexPath:indexPath.row]) {
         
         cell.imageView.image = [UIImage imageNamed:@"folder"];
-        //       cell.detailTextLabel.text = [self.fileManager sizeOfFile:filePath];
+        cell.detailTextLabel.text = [self.fileManager sizeOfFolder:fileName];
     }
    else {
         cell.imageView.image = [UIImage imageNamed:@"file"];
-   //     NSString *filePath = [self.fileManager.path stringByAppendingPathComponent:fileName];
-    //    cell.detailTextLabel.text = [self.fileManager sizeOfFile:filePath];
+        cell.detailTextLabel.text = [self.fileManager sizeOfFile:fileName];
     }
     
     return cell;
@@ -171,14 +158,13 @@ UIAlertAction* actionCancel = [UIAlertAction actionWithTitle:@"Cancel"
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath{
     
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-
-    if ([self isDirectoryAtIndexPath:indexPath]) {
+    
+    if ([self.fileManager isDirectoryAtIndexPath:indexPath.row]) {
         
-        NSString *fileName = [self.contents objectAtIndex:indexPath.row];
-        NSString *path = [self.path stringByAppendingPathComponent:fileName];
+        NSString *fileName = [self.fileManager.contents objectAtIndex:indexPath.row];
+        NSString *path = [self.fileManager.path stringByAppendingPathComponent:fileName];
         DirectoryViewController *vc = [[DirectoryViewController alloc]initWithFolderPath:path];
         [self.navigationController pushViewController:vc animated:YES];
-        
     }
  
 }
@@ -186,14 +172,11 @@ UIAlertAction* actionCancel = [UIAlertAction actionWithTitle:@"Cancel"
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath{
     
     if (editingStyle == UITableViewCellEditingStyleDelete) {
-  /*
-        NSString* fileName = [self.fileManager.contents objectAtIndex:indexPath.row];
-        NSString* filePath = [self.fileManager.path stringByAppendingPathComponent:fileName];
-        [self.fileManager deleteFolderAtPath:filePath];
-        NSArray* array = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:self.fileManager.path error:nil];
-        self.fileManager.contents = [NSMutableArray arrayWithArray:array];
-        [self.tableView reloadData];
-  */
+        
+          NSString *fileName = [self.fileManager.contents objectAtIndex:indexPath.row];
+          NSString *filePath = [self.fileManager.path stringByAppendingPathComponent:fileName];
+          [self.fileManager deleteFolderAtPath:filePath];
+          [self.tableView reloadData];
     }
 }
 
